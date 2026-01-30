@@ -1145,8 +1145,9 @@ Deploy this demo to Azure Container Apps with a single command using Azure Devel
 ### Quick Deploy
 
 ```bash
-# 1. Login to Azure
+# 1. Login to Azure (both azd and az CLI are required)
 azd auth login
+az account show >/dev/null 2>&1 || az login
 
 # 2. Create a new environment
 azd env new cobol-demo-prod
@@ -1155,25 +1156,12 @@ azd env new cobol-demo-prod
 azd env set AZURE_SUBSCRIPTION_ID "your-subscription-id"
 azd env set AZURE_LOCATION "japaneast"
 
-# 4. Deploy everything with one command!
-#    (Environment variables are automatically loaded from Config/ai-config.local.env)
+# 4. Deploy everything in one command!
 azd up
 ```
-
-> **Tip:** If you have multiple Azure subscriptions, set `AZURE_SUBSCRIPTION_ID` before running `azd up` to avoid being prompted. You can find your subscription ID with `az account list --output table`.
+> **Tip:** If missing Data/migration.db, run a migration first. Use `doctor.sh run`
 
 That's it! The deployment automatically reads your Azure OpenAI settings from `Config/ai-config.local.env`.
-
-### Manual Environment Variable Override
-
-If you need to override settings or don't have the config file:
-
-```bash
-azd env set AZURE_OPENAI_ENDPOINT "https://your-resource.openai.azure.com/"
-azd env set AZURE_OPENAI_API_KEY "your-api-key"
-azd env set AZURE_OPENAI_DEPLOYMENT_NAME "your-deployment-name"
-azd env set AZURE_OPENAI_MODEL_ID "gpt-4o"
-```
 
 ### What Gets Deployed
 
@@ -1182,8 +1170,8 @@ azd env set AZURE_OPENAI_MODEL_ID "gpt-4o"
 | **Resource Group** | `rg-<env-name>` |
 | **Container Apps Environment** | Managed environment for containers |
 | **Container Registry** | Private registry for app images |
-| **McpChatWeb** | Web portal (externally accessible) |
-| **Neo4j** | Graph database (internal only) |
+| **Container App (mcpchatweb)** | Web portal (externally accessible) |
+| **Container App (neo4j)** | Graph database (internal only) |
 | **Storage Account** | Azure Files for data persistence |
 | **Log Analytics** | Centralized logging |
 
@@ -1200,22 +1188,6 @@ rg-${AZURE_ENV_NAME}
 | azd Environment Name | Resource Group Name |
 |---------------------|---------------------|
 | `cobol-demo-prod` | `rg-cobol-demo-prod` |
-| `demo-dev` | `rg-demo-dev` |
-| `myapp` | `rg-myapp` |
-
-**Specifying the Azure region:**
-
-```bash
-# Option 1: Interactive (prompted during azd up)
-azd env new cobol-demo-prod
-azd up
-# → You'll be asked to select a region
-
-# Option 2: Pre-set the region
-azd env new cobol-demo-prod
-azd env set AZURE_LOCATION "japaneast"
-azd up
-```
 
 ### Environment Variables Reference
 

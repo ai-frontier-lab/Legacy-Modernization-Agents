@@ -141,6 +141,9 @@ module mcpChatWeb 'modules/mcpchatweb.bicep' = {
     containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
     containerRegistryName: containerRegistry.outputs.name
     imageName: 'mcpchatweb:${environmentName}'
+    // Use a small placeholder image during initial provisioning.
+    // azd deploy will later build/push the real image to ACR and update the container app.
+    provisioningImage: 'hashicorp/http-echo:0.2.3'
     neo4jHost: neo4j.outputs.internalHost
     neo4jPassword: neo4jPassword
     azureOpenAiEndpoint: azureOpenAiEndpoint
@@ -156,5 +159,6 @@ output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
 output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
+output SERVICE_MCPCHATWEB_NAME string = mcpChatWeb.outputs.name
 output SERVICE_MCPCHATWEB_URI string = mcpChatWeb.outputs.uri
 output NEO4J_INTERNAL_HOST string = neo4j.outputs.internalHost

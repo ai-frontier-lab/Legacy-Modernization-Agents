@@ -25,7 +25,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
 resource neo4j 'Microsoft.App/containerApps@2023-05-01' = {
   name: name
   location: location
-  tags: tags
+  tags: union(tags, { 'azd-service-name': 'neo4j' })
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
     configuration: {
