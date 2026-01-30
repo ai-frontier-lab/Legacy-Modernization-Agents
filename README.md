@@ -19,6 +19,7 @@ Have a look at the talk Julia did at the WeAreDevelopers World Congress 2025: ht
 - [CLI Reference](#-cli-commands-reference) - Doctor.sh and .NET commands
 - [Step-by-Step Guide](#step-by-step-guide) - Configuration to deployment
 - [How It Works](#how-it-works---architecture--flow) - Technical details
+- [Azure Deployment](#️-azure-container-apps-deployment) - Deploy to Azure with azd
 - [Known Issues & Ideas](#known-issues) - Troubleshooting and roadmap
 
 ## 🚀 Quick Start
@@ -1127,6 +1128,132 @@ dotnet test McpChatWeb.Tests/McpChatWeb.Tests.csproj
 - **102 COBOL files** processed → **99 Java Quarkus files** generated (97% success rate)
 - **205 Azure OpenAI API calls**, ~1.2 hours total, $0.31 cost
 - **Outputs**: Java/C# code in `output/`, docs in `output/`, logs in `Logs/`, metadata in `Data/migration.db`, graph in Neo4j
+
+---
+
+## ☁️ Azure Container Apps Deployment
+
+Deploy this demo to Azure Container Apps with a single command using Azure Developer CLI (azd).
+
+### Prerequisites
+
+- Azure CLI installed (`az --version`)
+- Azure Developer CLI installed (`azd version`) - [Install azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+- Azure subscription with permissions to create resources
+- `Config/ai-config.local.env` configured with your Azure OpenAI credentials
+
+### Quick Deploy
+
+```bash
+# 1. Login to Azure
+azd auth login
+
+# 2. Create a new environment
+azd env new cobol-demo-prod
+
+# 3. (Optional) Specify Azure subscription and location
+azd env set AZURE_SUBSCRIPTION_ID "your-subscription-id"
+azd env set AZURE_LOCATION "japaneast"
+
+# 4. Deploy everything with one command!
+#    (Environment variables are automatically loaded from Config/ai-config.local.env)
+azd up
+```
+
+> **Tip:** If you have multiple Azure subscriptions, set `AZURE_SUBSCRIPTION_ID` before running `azd up` to avoid being prompted. You can find your subscription ID with `az account list --output table`.
+
+That's it! The deployment automatically reads your Azure OpenAI settings from `Config/ai-config.local.env`.
+
+### Manual Environment Variable Override
+
+If you need to override settings or don't have the config file:
+
+```bash
+azd env set AZURE_OPENAI_ENDPOINT "https://your-resource.openai.azure.com/"
+azd env set AZURE_OPENAI_API_KEY "your-api-key"
+azd env set AZURE_OPENAI_DEPLOYMENT_NAME "your-deployment-name"
+azd env set AZURE_OPENAI_MODEL_ID "gpt-4o"
+```
+
+### What Gets Deployed
+
+| Resource | Description |
+|----------|-------------|
+| **Resource Group** | `rg-<env-name>` |
+| **Container Apps Environment** | Managed environment for containers |
+| **Container Registry** | Private registry for app images |
+| **McpChatWeb** | Web portal (externally accessible) |
+| **Neo4j** | Graph database (internal only) |
+| **Storage Account** | Azure Files for data persistence |
+| **Log Analytics** | Centralized logging |
+
+### Resource Group Naming
+
+The resource group name is determined by the environment name you specify:
+
+```
+rg-${AZURE_ENV_NAME}
+```
+
+**Examples:**
+
+| azd Environment Name | Resource Group Name |
+|---------------------|---------------------|
+| `cobol-demo-prod` | `rg-cobol-demo-prod` |
+| `demo-dev` | `rg-demo-dev` |
+| `myapp` | `rg-myapp` |
+
+**Specifying the Azure region:**
+
+```bash
+# Option 1: Interactive (prompted during azd up)
+azd env new cobol-demo-prod
+azd up
+# → You'll be asked to select a region
+
+# Option 2: Pre-set the region
+azd env new cobol-demo-prod
+azd env set AZURE_LOCATION "japaneast"
+azd up
+```
+
+### Environment Variables Reference
+
+Environment variables are automatically loaded from `Config/ai-config.local.env`. You can also override them with `azd env set`.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AZURE_OPENAI_ENDPOINT` | ✅ | Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_API_KEY` | ✅ | Azure OpenAI API key |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | ✅ | Model deployment name |
+| `AZURE_OPENAI_MODEL_ID` | ❌ | Model ID (default: from config) |
+| `NEO4J_PASSWORD` | ❌ | Neo4j password (default: `cobol-migration-2025`) |
+
+### After Deployment
+
+```bash
+# View deployed resources
+azd show
+
+# Get the Web Portal URL
+azd env get-values | grep SERVICE_MCPCHATWEB_URI
+
+# View logs
+az containerapp logs show --name mcpchatweb --resource-group rg-<env-name>
+
+# Tear down all resources
+azd down
+```
+
+### Update Deployment
+
+```bash
+# Deploy code changes only
+azd deploy
+
+# Update infrastructure and code
+azd up
+```
 
 ---
 

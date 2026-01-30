@@ -1,0 +1,125 @@
+# =============================================================================
+# Azure Developer CLI (azd) Configuration
+# COBOL to Quarkus Migration Demo - Azure Container Apps Deployment
+# =============================================================================
+# Usage:
+#   azd auth login
+#   azd env new <env-name>
+#   azd up
+#
+# Environment variables are automatically loaded from Config/ai-config.local.env
+# =============================================================================
+
+name: cobol-migration-demo
+metadata:
+  template: cobol-migration-demo@0.0.1
+
+# Azure infrastructure configuration
+infra:
+  provider: bicep
+  path: infra
+
+# Service definitions
+services:
+  # Main Web Portal - McpChatWeb
+  mcpchatweb:
+    host: containerapp
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT}/mcpchatweb:${AZURE_ENV_NAME}
+    
+  # Neo4j Graph Database
+  neo4j:
+    host: containerapp
+    image: neo4j:5.15.0
+
+# Pipeline configuration (optional - for CI/CD)
+pipeline:
+  provider: github
+
+# Hooks for custom scripts
+hooks:
+  # Pre-provision hook - load environment variables from ai-config.local.env
+  preprovision:
+    shell: sh
+    run: |
+      echo "🔧 Loading environment variables from Config/ai-config.local.env..."
+      
+      CONFIG_FILE="Config/ai-config.local.env"
+      
+      if [ -f "$CONFIG_FILE" ]; then
+        echo "✅ Found configuration file: $CONFIG_FILE"
+        
+        # Parse and set environment variables for azd
+        while IFS='=' read -r key value; do
+          # Skip comments and empty lines
+          case "$key" in
+            \#*|"") continue ;;
+          esac
+          
+          # Remove surrounding quotes from value
+          value=$(echo "$value" | sed 's/^"//' | sed 's/"$//')
+          
+          # Set the environment variable for azd if it's one of our required vars
+          case "$key" in
+            AZURE_OPENAI_ENDPOINT|AZURE_OPENAI_API_KEY|AZURE_OPENAI_DEPLOYMENT_NAME|AZURE_OPENAI_MODEL_ID|NEO4J_PASSWORD)
+              echo "  → Setting $key"
+              azd env set "$key" "$value" 2>/dev/null || true
+              ;;
+          esac
+        done < "$CONFIG_FILE"
+        
+        echo "✅ Environment variables loaded"
+      else
+        echo "⚠️  Config file not found: $CONFIG_FILE"
+        echo "   Please create it from Config/ai-config.local.env.template"
+        echo "   Or set variables manually with: azd env set <KEY> <VALUE>"
+      fi
+  
+  # Pre-package hook - skip packaging (we handle image in postprovision)
+  prepackage:
+    shell: sh
+    run: |
+      echo "📦 Package phase - image will be built in postprovision hook"
+  
+  # Post-provision hook - build and push Docker image to ACR
+  postprovision:
+    shell: sh
+    run: |
+      echo "🐳 Building and pushing mcpchatweb Docker image to ACR..."
+      
+      # Get ACR name from azd environment
+      ACR_NAME=$(azd env get-values 2>/dev/null | grep "^AZURE_CONTAINER_REGISTRY_NAME=" | cut -d'=' -f2 | tr -d '"')
+      
+      if [ -z "$ACR_NAME" ]; then
+        echo "❌ ACR name not found in environment"
+        exit 1
+      fi
+      
+      IMAGE_TAG="${AZURE_ENV_NAME:-latest}"
+      
+      echo "  → Building image with ACR: ${ACR_NAME}"
+      echo "  → Image tag: mcpchatweb:${IMAGE_TAG}"
+      
+      # Build and push using ACR build
+      az acr build \
+        --registry "$ACR_NAME" \
+        --image "mcpchatweb:${IMAGE_TAG}" \
+        --file McpChatWeb/Dockerfile \
+        .
+      
+      echo "✅ Docker image pushed to ACR: ${ACR_NAME}.azurecr.io/mcpchatweb:${IMAGE_TAG}"
+  
+  # Post-deploy hook - display access information
+  postdeploy:
+    shell: sh
+    run: |
+      echo ""
+      echo "=========================================="
+      echo "  COBOL Migration Demo Deployed!"
+      echo "=========================================="
+      echo ""
+      echo "Access the Web Portal at:"
+      echo "  ${SERVICE_MCPCHATWEB_URI}"
+      echo ""
+      echo "Neo4j Browser (internal):"
+      echo "  http://neo4j:7474"
+      echo ""
